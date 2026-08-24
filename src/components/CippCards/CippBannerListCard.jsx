@@ -3,6 +3,7 @@ import { useState, useCallback } from "react";
 import {
   Box,
   Card,
+  Checkbox,
   Collapse,
   Divider,
   IconButton,
@@ -16,12 +17,33 @@ import { CippPropertyListCard } from "./CippPropertyListCard";
 import { CippDataTable } from "../CippTable/CippDataTable";
 
 export const CippBannerListCard = (props) => {
-  const { items = [], isCollapsible = false, isFetching = false, children, ...other } = props;
+  const {
+    items = [],
+    isCollapsible = false,
+    isFetching = false,
+    children,
+    onSelectionChange,
+    selectedItems = [],
+    ...other
+  } = props;
   const [expanded, setExpanded] = useState(null);
 
   const handleExpand = useCallback((itemId) => {
     setExpanded((prevState) => (prevState === itemId ? null : itemId));
   }, []);
+
+  const handleCheckboxChange = useCallback(
+    (itemId, checked) => {
+      if (onSelectionChange) {
+        if (checked) {
+          onSelectionChange([...selectedItems, itemId]);
+        } else {
+          onSelectionChange(selectedItems.filter((id) => id !== itemId));
+        }
+      }
+    },
+    [onSelectionChange, selectedItems]
+  );
 
   const hasItems = items.length > 0;
 
@@ -31,7 +53,7 @@ export const CippBannerListCard = (props) => {
       <Stack spacing={3} {...other}>
         {[...Array(1)].map((_, index) => (
           <Card key={index}>
-            <Stack direction="row" flexWrap="wrap" justifyContent="space-between" sx={{ p: 3 }}>
+            <Stack useFlexGap direction="row" flexWrap="wrap" justifyContent="space-between" sx={{ p: 3 }}>
               <Stack direction="row" spacing={2} alignItems="center">
                 <Box>
                   <Skeleton variant="text" width={80} />
@@ -72,10 +94,15 @@ export const CippBannerListCard = (props) => {
                 <li key={item.id}>
                   <Stack
                     direction="row"
-                    flexWrap="wrap"
                     justifyContent="space-between"
+                    // Status, actions and the expander take their own row below md: sharing
+                    // one line with them squeezed the text column to about 90px, which broke
+                    // the subtext one word per line and ellipsed every title.
+                    useFlexGap
+                    flexWrap={{ xs: "wrap", md: "nowrap" }}
+                    rowGap={1.5}
                     sx={{
-                      p: 3,
+                      p: { xs: 2, md: 3 },
                       ...(isCollapsible && {
                         cursor: "pointer",
                         "&:hover": {
@@ -86,12 +113,28 @@ export const CippBannerListCard = (props) => {
                     onClick={isCollapsible ? () => handleExpand(item.id) : undefined}
                   >
                     {/* Left Side: cardLabelBox */}
-                    <Stack direction="row" spacing={2} alignItems="center">
+                    <Stack
+                      direction="row"
+                      spacing={2}
+                      alignItems="center"
+                      sx={{ flex: { xs: "1 1 100%", md: "1 1 auto" }, minWidth: 0 }}
+                    >
+                      {onSelectionChange && (
+                        <Checkbox
+                          checked={selectedItems.includes(item.id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleCheckboxChange(item.id, e.target.checked);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
                       <Box
                         sx={{
                           alignItems: "center",
                           display: "flex",
                           flexDirection: "column",
+                          flexShrink: 0,
                         }}
                       >
                         {typeof item.cardLabelBox === "object" ? (
@@ -111,8 +154,16 @@ export const CippBannerListCard = (props) => {
                       </Box>
 
                       {/* Main Text and Subtext */}
-                      <Box>
-                        <Typography color="text.primary" variant="h6">
+                      <Box sx={{ flex: 1, minWidth: 0, pr: { xs: 0, md: 2 } }}>
+                        <Typography
+                          color="text.primary"
+                          variant="h6"
+                          sx={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {item.text}
                         </Typography>
                         <Typography color="text.secondary" variant="body2">
@@ -122,7 +173,15 @@ export const CippBannerListCard = (props) => {
                     </Stack>
 
                     {/* Right Side: Status and Expand Icon */}
-                    <Stack alignItems="center" direction="row" spacing={2}>
+                    <Stack
+                      alignItems="center"
+                      direction="row"
+                      spacing={2}
+                      // Pushed to the right edge once this group wraps onto its own row,
+                      // so the expander sits in the same place on every item instead of
+                      // trailing whatever width that item's action button happens to be.
+                      sx={{ flexShrink: 0, ml: { xs: "auto", md: 0 } }}
+                    >
                       {item?.statusText && (
                         <Stack alignItems="center" direction="row" spacing={1}>
                           <Box
@@ -166,7 +225,7 @@ export const CippBannerListCard = (props) => {
                         {item?.propertyItems?.length > 0 && (
                           <CippPropertyListCard
                             propertyItems={item.propertyItems || []}
-                            layout="dual"
+                            layout={other.layout || "dual"}
                             isFetching={item.isFetching || false}
                           />
                         )}
@@ -204,7 +263,6 @@ CippBannerListCard.propTypes = {
       actionButton: PropTypes.element,
       propertyItems: PropTypes.array,
       table: PropTypes.object,
-      actionButton: PropTypes.element,
       isFetching: PropTypes.bool,
       children: PropTypes.node,
       cardLabelBoxActions: PropTypes.element,
@@ -212,4 +270,6 @@ CippBannerListCard.propTypes = {
   ).isRequired,
   isCollapsible: PropTypes.bool,
   isFetching: PropTypes.bool,
+  onSelectionChange: PropTypes.func,
+  selectedItems: PropTypes.array,
 };
